@@ -1,5 +1,7 @@
 # ffarmgo
 
+![ffarmgo: evolutionary image filters, grown by genetic programming](docs/title.png)
+
 **ffarmgo** is a cross-platform port of **Filter Farm**, Kees van Prooijen's
 evolutionary image filter for Adobe Photoshop, written in pure Go.
 
@@ -64,10 +66,11 @@ affiliated with or endorsed by Kees van Prooijen.
 
 ## Installation
 
-You need **Go 1.26** or newer (<https://go.dev/dl/>).
+You need **Go 1.26** or newer (<https://go.dev/dl/>). Unpack the release
+archive and build:
 
 ```bash
-git clone <repository-url> ffarmgo
+tar xzf ffarmgo-release-2026-10-03.tar.gz
 cd ffarmgo
 go build -o . ./cmd/...
 ```
