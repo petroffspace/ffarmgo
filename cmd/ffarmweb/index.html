@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filter Farm</title>
+<style>
+:root {
+  --bg: #f4f2ee; --panel: #ffffff; --ink: #1f1d1a; --muted: #6d675f; --line: #ddd8cf;
+  --accent: #2f6f5e; --accent-ink: #ffffff; --like: #2f8a4f; --dislike: #b5452f; --sel: #c98a1b;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171715; --panel: #22211f; --ink: #ece8e1; --muted: #9c968c; --line: #37352f;
+    --accent: #5fb39a; --accent-ink: #0e1a16; --like: #63c184; --dislike: #e0775f; --sel: #e7b04a;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171715; --panel: #22211f; --ink: #ece8e1; --muted: #9c968c; --line: #37352f;
+  --accent: #5fb39a; --accent-ink: #0e1a16; --like: #63c184; --dislike: #e0775f; --sel: #e7b04a;
+  --shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+h1 { font-size: 17px; margin: 0 8px 0 0; letter-spacing: .02em; }
+.group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+button, .btn, select { font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+button:hover:not(:disabled), .btn:hover { border-color: var(--muted); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+input[type=file] { display: none; }
+label.btn select { border: 0; padding: 0 2px; background: transparent; }
+.info { color: var(--muted); font-size: 13px; padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.info b { color: var(--ink); font-weight: 600; }
+main { padding: 8px 16px 32px; max-width: 1200px; margin: 0 auto; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 760px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.cell { background: var(--panel); border: 2px solid transparent; border-radius: 10px;
+  box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; }
+.cell.selected { border-color: var(--sel); }
+.cell.inactive .pic { opacity: .55; }
+.pic { position: relative; background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 0/16px 16px;
+  cursor: pointer; aspect-ratio: var(--ar, 4/3); }
+.pic img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.pic .spin { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+.pic img:not(.loading) + .spin { display: none; }
+.badge { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.6); color: #fff;
+  font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+.badge.sel { left: auto; right: 6px; background: var(--sel); color: #1a1408; font-weight: 600; }
+.meta { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.row code { font-size: 11px; }
+.rate { display: flex; align-items: center; gap: 8px; }
+.rate input { flex: 1; accent-color: var(--accent); }
+.rate .val { min-width: 76px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; }
+.val.like { color: var(--like); } .val.dislike { color: var(--dislike); }
+.links { display: flex; gap: 10px; font-size: 12px; }
+.links a { color: var(--accent); text-decoration: none; }
+.links a:hover, .links .load:hover { text-decoration: underline; }
+.links .load { color: var(--accent); cursor: pointer; margin-left: auto; }
+.pic.drop { outline: 3px dashed var(--accent); outline-offset: -3px; }
+.hint { color: var(--muted); font-size: 12px; margin: 14px 0 0; }
+.export { background: var(--panel); border-radius: 10px; box-shadow: var(--shadow); padding: 12px 14px;
+  margin: 0 0 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.export h2 { font-size: 14px; margin: 0; }
+.export label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.export .size { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 90px; }
+.export .status { color: var(--muted); font-size: 13px; flex-basis: 100%; min-height: 1.2em; }
+.export .status:empty { display: none; }
+.export .status.err { color: var(--dislike); }
+.batch { background: var(--panel); border-radius: 10px; box-shadow: var(--shadow); padding: 12px 14px;
+  margin: 0 0 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.batch h2 { font-size: 14px; margin: 0; }
+.batch label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.batch label.path { flex: 1 1 260px; min-width: 0; }
+.batch input[type=text] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 9px; flex: 1; min-width: 0; }
+.batch .found { color: var(--muted); font-size: 12px; }
+.batch .found.err { color: var(--dislike); }
+.batch progress { flex-basis: 100%; height: 10px; accent-color: var(--accent); }
+.batch .bstatus { flex-basis: 100%; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.batch .bstatus:empty { display: none; }
+.batch ul { flex-basis: 100%; margin: 0; padding-left: 18px; color: var(--dislike); font-size: 12px; }
+.batch ul:empty { display: none; }
+#toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--dislike);
+  color: #fff; padding: 8px 14px; border-radius: 6px; display: none; max-width: calc(100% - 32px); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Filter Farm</h1>
+  <div class="group">
+    <button id="breed" class="primary" title="Rate the active cells and grow new ones (B)">Breed</button>
+    <button id="undo" title="Undo the last change (U)">Undo</button>
+    <button id="new">New session</button>
+    <label class="btn" title="How many cells breed">Active
+      <select id="active"></select></label>
+  </div>
+  <div class="group">
+    <label class="btn">Open .gds<input type="file" id="open" accept=".gds"></label>
+    <a class="btn" href="/api/session.gds" download>Save .gds</a>
+    <label class="btn">Source image<input type="file" id="source" accept="image/*"></label>
+  </div>
+</header>
+<div class="info" id="info"></div>
+<main>
+  <section class="export" aria-label="Render">
+    <h2>Render</h2>
+    <label>Cell <select id="xcell"></select></label>
+    <label>Aspect ratio <select id="xaspect"></select></label>
+    <label>Format <select id="xformat"></select></label>
+    <span class="size" id="xsize"></span>
+    <button id="xrender" class="primary">Render</button>
+    <div class="status" id="xstatus" aria-live="polite"></div>
+  </section>
+  <section class="batch" aria-label="Apply to a folder">
+    <h2>Apply to a folder</h2>
+    <label>Cell <select id="bcell"></select></label>
+    <label class="path">Folder <input type="text" id="bin" placeholder="/home/alex/Pictures/shoot" spellcheck="false" autocomplete="off"></label>
+    <label><input type="checkbox" id="brec"> Include subfolders</label>
+    <span class="found" id="bfound"></span>
+    <button id="bstart" class="primary">Apply</button>
+    <button id="bcancel" hidden>Cancel</button>
+    <progress id="bprog" max="1" value="0" hidden></progress>
+    <div class="bstatus" id="bstatus" aria-live="polite"></div>
+    <ul id="berrors"></ul>
+  </section>
+  <div class="grid" id="grid"></div>
+  <p class="hint">Click a picture to select the cell the filter renders. Slide right to favour a cell's choices, left to
+    disfavour them, then Breed. Only active cells are rated and regrown. Previews use the dialog's 64-point plasma over
+    a scaled copy of the source; “Full render” is the plugin's final render at full size.</p>
+</main>
+<div id="toast"></div>
+<script>
+const $ = (s) => document.querySelector(s);
+let st = null;
+// The dialog's slider runs 0 (favour) … 50 (neutral) … 100 (disfavour);
+// the page shows it the other way round: right = favour.
+const ui = new Array(9).fill(50);
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 5000);
+}
+
+async function call(path, body, isForm) {
+  const opt = { method: 'POST' };
+  if (isForm) opt.body = body;
+  else if (body) { opt.body = JSON.stringify(body); opt.headers = { 'Content-Type': 'application/json' }; }
+  const r = await fetch(path, opt);
+  if (!r.ok) { toast((await r.text()).trim() || r.statusText); return; }
+  apply(await r.json());
+}
+
+function rateLabel(v) {
+  const d = v - 50;
+  if (d === 0) return ['neutral', ''];
+  return d > 0 ? ['favour +' + d, 'like'] : ['disfavour ' + d, 'dislike'];
+}
+
+function build() {
+  const g = $('#grid');
+  for (let i = 0; i < 9; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell'; c.id = 'cell' + i;
+    c.innerHTML = `
+      <div class="pic" title="Select this cell"><img alt="Cell ${i}" class="loading"><div class="spin">rendering…</div>
+        <span class="badge">${i}</span><span class="badge sel" hidden>selected</span></div>
+      <div class="meta">
+        <div class="rate"><input type="range" min="0" max="100" value="50" aria-label="Rating for cell ${i}">
+          <span class="val">neutral</span></div>
+        <div class="row"><code class="seed"></code><span class="root"></span></div>
+        <div class="links"><a class="full" target="_blank">Full render</a><a class="dl">PNG</a><a class="gdo" title="Download this cell's filter">.gdo</a>
+          <label class="load" title="Replace this cell with a .gdo filter (or drop one on the picture)">Load .gdo<input type="file" accept=".gdo"></label></div>
+      </div>`;
+    const img = c.querySelector('img');
+    img.onload = () => img.classList.remove('loading');
+    img.onerror = () => { img.classList.remove('loading'); c.querySelector('.spin').textContent = 'render failed'; };
+    c.querySelector('.pic').onclick = () =>
+      call('/api/select', { cell: st && st.selected === i ? -1 : i });
+    const range = c.querySelector('input');
+    range.oninput = () => { ui[i] = +range.value; showRate(i); };
+    range.ondblclick = () => { ui[i] = 50; range.value = 50; showRate(i); };
+    c.querySelector('.full').href = `/api/render/${i}.png`;
+    c.querySelector('.dl').href = `/api/render/${i}.png?download`;
+    c.querySelector('.gdo').href = `/api/gdo/${i}`;
+    const loadGdo = (file) => {
+      if (!file) return;
+      const fd = new FormData(); fd.append('file', file);
+      call(`/api/gdo/${i}`, fd, true);
+    };
+    const input = c.querySelector('.load input');
+    input.onchange = () => { loadGdo(input.files[0]); input.value = ''; };
+    const pic = c.querySelector('.pic');
+    pic.ondragover = (e) => { e.preventDefault(); pic.classList.add('drop'); };
+    pic.ondragleave = () => pic.classList.remove('drop');
+    pic.ondrop = (e) => { e.preventDefault(); pic.classList.remove('drop'); loadGdo(e.dataTransfer.files[0]); };
+    g.appendChild(c);
+  }
+  const sel = $('#active');
+  for (let n = 1; n <= 9; n++) sel.add(new Option(n, n));
+  sel.onchange = () => call('/api/active', { active: +sel.value });
+}
+
+function showRate(i) {
+  const v = document.querySelector(`#cell${i} .val`);
+  const [t, cls] = rateLabel(ui[i]);
+  v.textContent = t; v.className = 'val ' + cls;
+}
+
+function apply(s) {
+  const prev = st;
+  st = s;
+  setupExport(s);
+  batchCell();
+  document.documentElement.style.setProperty('--ar', `${s.previewW}/${s.previewH}`);
+  $('#info').innerHTML =
+    `<span>Generation <b>${s.breeds}</b></span>` +
+    `<span>Active cells <b>${s.active}</b></span>` +
+    `<span>Selected <b>${s.selected < 0 ? 'none' : s.selected}</b></span>` +
+    `<span>Source <b>${esc(s.source)}</b> · ${s.srcW}×${s.srcH} · ${s.mode}</span>` +
+    `<span>Preview ${s.previewW}×${s.previewH}</span>`;
+  $('#active').value = s.active;
+  $('#undo').disabled = !s.canUndo;
+  for (let i = 0; i < 9; i++) {
+    const c = $('#cell' + i), cell = s.cells[i], active = i < s.active;
+    c.classList.toggle('selected', i === s.selected);
+    c.classList.toggle('inactive', !active);
+    c.querySelector('.badge.sel').hidden = i !== s.selected;
+    c.querySelector('.seed').textContent = cell.seed;
+    c.querySelector('.root').textContent = cell.size ? `${cell.root} root · ${cell.size}` : `${cell.root} root`;
+    const range = c.querySelector('input');
+    range.disabled = !active;
+    ui[i] = 100 - s.sliders[i]; range.value = ui[i]; showRate(i);
+    // Only a different cell object or a new source changes a picture.
+    if (!prev || prev.cells[i].rev !== cell.rev || prev.srcRev !== s.srcRev) {
+      const img = c.querySelector('img');
+      img.classList.add('loading'); c.querySelector('.spin').textContent = 'rendering…';
+      img.src = `/api/cell/${i}.png?r=${cell.rev}&s=${s.srcRev}`;
+    }
+  }
+}
+function esc(t) { return t.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
+
+$('#breed').onclick = () => call('/api/breed', { sliders: ui.map((v) => 100 - v) });
+$('#undo').onclick = () => call('/api/undo');
+$('#new').onclick = () => call('/api/new', { active: +$('#active').value });
+for (const [id, path] of [['#open', '/api/open'], ['#source', '/api/source']]) {
+  $(id).onchange = (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const fd = new FormData(); fd.append('file', f); e.target.value = '';
+    call(path, fd, true);
+  };
+}
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' && e.target.type !== 'range' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'b') $('#breed').click();
+  if (e.key === 'u' && !$('#undo').disabled) $('#undo').click();
+});
+
+// ---- render panel ----
+const store = {
+  get(k) { try { return localStorage.getItem('ffarm.' + k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('ffarm.' + k, v); } catch {} },
+};
+let xcellTouched = false;
+function setupExport(s) {
+  const xa = $('#xaspect'), xf = $('#xformat'), xc = $('#xcell');
+  if (!xa.options.length) {
+    for (const a of s.aspects) xa.add(new Option(a.label, a.id));
+    for (const f of s.formats) xf.add(new Option(f.label, f.id));
+    for (let i = 0; i < 9; i++) xc.add(new Option(i, i));
+    xa.value = store.get('aspect') || '16:9';
+    xf.value = store.get('format') || 'fhd';
+    if (xa.selectedIndex < 0) xa.selectedIndex = 0;
+    if (xf.selectedIndex < 0) xf.selectedIndex = 0;
+    xa.onchange = () => { store.set('aspect', xa.value); showSize(); };
+    xf.onchange = () => { store.set('format', xf.value); showSize(); };
+    xc.onchange = () => { xcellTouched = true; };
+  }
+  if (!xcellTouched && s.selected >= 0) xc.value = s.selected;
+  showSize();
+}
+function exportSize() {
+  const sz = st.sizes[$('#xaspect').value + '|' + $('#xformat').value];
+  return sz ? sz[0] + '×' + sz[1] : '';
+}
+function showSize() { $('#xsize').textContent = exportSize(); }
+
+$('#xrender').onclick = async () => {
+  const btn = $('#xrender'), status = $('#xstatus');
+  const cell = $('#xcell').value, size = exportSize();
+  const q = new URLSearchParams({ cell, aspect: $('#xaspect').value, format: $('#xformat').value });
+  btn.disabled = true; status.className = 'status';
+  const t0 = performance.now();
+  const tick = () => { status.textContent = `Rendering cell ${cell} at ${size}… ${Math.round((performance.now() - t0) / 1000)} s`; };
+  tick(); const timer = setInterval(tick, 500);
+  try {
+    const r = await fetch('/api/export?' + q);
+    if (!r.ok) throw new Error((await r.text()).trim() || r.statusText);
+    const blob = await r.blob();
+    const name = (r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'ffarm.png';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    status.textContent = `Downloaded ${name} (${(blob.size / 1048576).toFixed(1)} MB) in ${secs} s.`;
+  } catch (e) {
+    status.className = 'status err'; status.textContent = 'Render failed: ' + e.message;
+  } finally {
+    clearInterval(timer); btn.disabled = false;
+  }
+};
+
+// ---- batch panel ----
+const bin = $('#bin'), bcell = $('#bcell'), brec = $('#brec');
+for (let i = 0; i < 9; i++) bcell.add(new Option(i, i));
+{ const v = store.get('bin'); if (v !== null) bin.value = v; }
+bin.addEventListener('change', () => store.set('bin', bin.value));
+brec.checked = store.get('brec') === '1';
+brec.addEventListener('change', () => { store.set('brec', brec.checked ? '1' : '0'); refreshFound(); });
+let bcellTouched = false;
+bcell.onchange = () => { bcellTouched = true; batchCell(); };
+
+let listTimer = null, listSeq = 0;
+function refreshFound() {
+  clearTimeout(listTimer);
+  listTimer = setTimeout(async () => {
+    const f = $('#bfound'), seq = ++listSeq;
+    if (!bin.value.trim()) { f.textContent = ''; f.className = 'found'; return; }
+    try {
+      const r = await (await fetch('/api/batch/list?' + new URLSearchParams({ in: bin.value, recursive: brec.checked }))).json();
+      if (seq !== listSeq) return;
+      f.className = r.error ? 'found err' : 'found';
+      f.textContent = r.error || `${r.count} PNG image${r.count === 1 ? '' : 's'}`;
+    } catch { /* the next keystroke retries */ }
+  }, 300);
+}
+bin.addEventListener('input', refreshFound);
+bin.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('#bstart').disabled) $('#bstart').click(); });
+
+// The panel's cell follows the grid selection until it is chosen here.
+function batchCell() {
+  if (!bcellTouched && st && st.selected >= 0) bcell.value = st.selected;
+  $('#bstart').textContent = `Apply cell ${bcell.value}`;
+}
+
+let batchPoll = null;
+function fmtSecs(ms) { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`; }
+function showBatch(b) {
+  $('#bstart').disabled = b.running;
+  $('#bcancel').hidden = !b.running;
+  const prog = $('#bprog');
+  const handled = b.done + b.skipped + b.failed;
+  prog.hidden = !b.started || b.started.startsWith('0001');
+  prog.max = Math.max(b.total, 1); prog.value = handled;
+  if (prog.hidden) { $('#bstatus').textContent = ''; return; }
+  const end = b.running ? Date.now() : Date.parse(b.finished);
+  const parts = [`${b.label}: ${handled} / ${b.total}`];
+  if (b.failed) parts.push(`${b.failed} failed`);
+  parts.push(fmtSecs(end - Date.parse(b.started)));
+  let line = parts.join(' · ');
+  if (b.running && b.current) line += ` · rendering ${b.current}`;
+  if (!b.running) line += b.error ? ` · stopped: ${b.error}` : ` · done: ${b.total} PNG images under ${b.in} replaced`;
+  $('#bstatus').textContent = line;
+  const ul = $('#berrors'); ul.innerHTML = '';
+  for (const e of b.errors || []) { const li = document.createElement('li'); li.textContent = e; ul.appendChild(li); }
+  clearTimeout(batchPoll);
+  if (b.running) batchPoll = setTimeout(pollBatch, 700);
+}
+async function pollBatch() {
+  try { showBatch(await (await fetch('/api/batch')).json()); }
+  catch { batchPoll = setTimeout(pollBatch, 2000); }
+}
+$('#bstart').onclick = async () => {
+  store.set('bin', bin.value);
+  const n = $('#bfound').classList.contains('err') ? '' : $('#bfound').textContent;
+  const where = bin.value.trim() + (brec.checked ? ' and its subfolders' : '');
+  if (!confirm(`Replace ${n || 'the images'} in ${where} with cell ${bcell.value}'s render?\n\nThe originals are overwritten; this cannot be undone.`)) return;
+  const body = { cell: +bcell.value, in: bin.value, recursive: brec.checked };
+  const r = await fetch('/api/batch', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+  if (!r.ok) { toast((await r.text()).trim() || r.statusText); return; }
+  showBatch(await r.json());
+};
+$('#bcancel').onclick = async () => showBatch(await (await fetch('/api/batch/cancel', { method: 'POST' })).json());
+
+build();
+pollBatch();
+fetch('/api/state').then((r) => r.json()).then(apply);
+</script>
+</body>
+</html>
