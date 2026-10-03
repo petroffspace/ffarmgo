@@ -70,7 +70,7 @@ You need **Go 1.26** or newer (<https://go.dev/dl/>). Unpack the release
 archive and build:
 
 ```bash
-tar xzf ffarmgo-release-2026-10-03.tar.gz
+git clone https://github.com/petroffspace/ffarmgo.git
 cd ffarmgo
 go build -o . ./cmd/...
 ```
